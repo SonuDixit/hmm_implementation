@@ -10,6 +10,13 @@ class hmm:
         """
         self.num_states = num_states
         self.num_obs = num_obs
+        if states is None and observations is not None:
+            '''intialise random A
+            initialise random B
+            Initialise random pi
+            '''
+            self.initialise_uniform()
+            pass
         if A is not None:
             self.A = A
             self.B = B
@@ -31,6 +38,7 @@ class hmm:
         self.obs_dict = obs_name_dict
         self._name_initialized = True
 
+    # def initalise_random(self, observations):
     def initialise_uniform(self):
         self.A = np.ones((self.num_states, self.num_states))  # laplacian smoothening
         self.pie = np.ones((self.num_states,))
@@ -44,7 +52,10 @@ class hmm:
         denominator = np.sum(self.B, axis=1)
         denominator = denominator.reshape(-1, 1)
         self.B /= denominator
+
     def initialise_special(self, states, observations):
+        if states is None:
+            return
         self.A = np.ones((self.num_states, self.num_states))  # laplacian smoothening
         self.pie = np.ones((self.num_states,))
         # self.A *= .005
@@ -66,6 +77,7 @@ class hmm:
         denominator = np.sum(self.B, axis=1)
         denominator = denominator.reshape(-1, 1)
         self.B /= denominator
+
     def initialise(self, states, observations):
         """
         :param states: list of state sequences each a np array
@@ -161,7 +173,108 @@ class hmm:
         # print('state sequence is',state_sequence)
         return best_state, state_sequence
 
-    
+    # def forward_scaled(self,obs):
+    #     """
+    #     :param obs: is a 1d array shape (T,), observations are in range(0,num_obs)
+    #     :return: calculate alphas of the forward calculation, shape(alpha) = T X num_states
+    #     """
+    #     self.alpha_tilda = np.zeros(shape=(obs.shape[0], self.num_states))
+    #     self.alpha_tilda[0] = self.pie * self.B[:, obs[0]]
+    #     self.scale_factor = [np.sum(self.alpha_tilda[0])]
+    #     # alpha_tilda[0] = sc
+    #     # print(scale_factor)
+    #     for i in range(1, obs.shape[0]):
+    #         #        print(alpha[i-1])
+    #         #        print(A)
+    #         self.alpha_tilda[i - 1] /= self.scale_factor[i - 1]
+    #         temp = np.matmul(self.alpha_tilda[i - 1], self.A)
+    #         #        print("temp is",temp)
+    #         self.alpha_tilda[i] = temp * self.B[:, obs[i]]
+    #         self.scale_factor.append(np.sum(self.alpha_tilda[i]))
+    #     self.alpha_tilda[-1] /= self.scale_factor[-1]
+    #     # return self.alpha_tilda, self.scale_factor
+
+    # def backward_scaled(self, obs):
+    #     self.beta_tilda = np.zeros(shape=(obs.shape[0], self.A.shape[0]))
+    #     self.beta_tilda[obs.shape[0] - 1] = 1
+    #     # self.beta_tilda /= self.scale_factor[-1]
+    #     time = obs.shape[0] - 2
+    #     while time >= 0:
+    #         self.beta_tilda[time + 1] /= self.scale_factor[time + 1]
+    #         for i in range(self.A.shape[0]):
+    #             self.beta_tilda[time][i] = np.sum(self.beta_tilda[time + 1] * self.A[i] * self.B[:, obs[time + 1]])
+    #             # beta[time] /= scale_factor[time]
+    #         time -= 1
+    #     self.beta_tilda[0] /= self.scale_factor[0]
+
+    # def train_on_examples_scaled(self, states, observations):
+    #     """
+    #     :param states: list of 1d array each of shape = (T, )
+    #     :param observations:list of 1d array each of shape = (T, )
+    #     :return:
+    #     """
+    #     pie_temp = np.zeros(self.pie.shape)
+    #     A_num_temp = np.zeros(self.A.shape)
+    #     A_deno_temp = np.zeros((self.num_states,1))
+    #     B_num_temp = np.zeros(self.B.shape)
+    #     B_deno_temp = np.zeros((self.A.shape[0],1))
+    #
+    #     log_prob = 0
+    #     for obs in observations:
+    #         self.forward_scaled(obs)
+    #         # log_prob += np.log(np.sum(self.alpha[-1])) #modify this
+    #         log_prob += np.log(np.prod(self.scale_factor))
+    #         self.backward_scaled(obs)
+    #         zeta, gamma = [], []
+    #         for t in range(obs.shape[0]-1):
+    #             ## calculate zeta_t
+    #             # zeta_table_for_t = np.zeros(self.A.shape[0], self.A.shape[0])
+    #             temp = self.beta_tilda[t + 1] * self.B[:, obs[t + 1]]
+    #             # temp = np.reshape(temp, newshape=(1, temp.shape[0]))
+    #             temp2 = self.alpha_tilda[t]
+    #             temp3 = np.outer(temp2, temp)
+    #             zeta_table_for_t = temp3 * self.A
+    #             zeta_table_for_t /= np.sum(zeta_table_for_t)
+    #             zeta.append(zeta_table_for_t)
+    #             ## calculate gamma
+    #             gamma_t = np.sum(zeta_table_for_t, axis=1)
+    #             gamma.append(gamma_t)
+    #
+    #         prob_of_obs = np.sum(self.alpha_tilda[-1]) #modify this
+    #         # prob_of_obs = np.prod(self.scale_factor)
+    #         ###updates...
+    #         zeta = np.array(zeta)
+    #         gamma = np.array(gamma)
+    #         pie_temp += gamma[0]
+    #         temp = np.sum(gamma, axis = 0).reshape(self.num_states,1)
+    #         A_num_temp += np.sum(zeta, axis =0)/prob_of_obs
+    #         A_deno_temp += temp/(prob_of_obs + 1e-6)
+    #
+    #         # updating B
+    #         # modify gamma array, now calculate gamma_T
+    #         gamma_T = self.alpha_tilda[-1,:]/np.sum(self.alpha_tilda[-1,:]) # gamma of last time step
+    #         gamma = gamma.tolist()
+    #         gamma.append(gamma_T)
+    #         gamma = np.array(gamma)
+    #         B_deno_temp += np.sum(gamma, axis = 0).reshape(-1,1) # required for broadcasting along column
+    #         # B_ = np.zeros(self.B.shape)
+    #         for i in range(obs.shape[0]):
+    #             B_num_temp[:,obs[i]] += gamma[i]
+    #             # print('B_ is',B_)
+    #         B_num_temp /= (prob_of_obs + 1e-6)
+    #         B_deno_temp /= (prob_of_obs + 1e-6)
+    #
+    #     self.A= A_num_temp / A_deno_temp
+    #     self.B = B_num_temp / B_deno_temp
+    #     self.pie = pie_temp/np.sum(pie_temp)
+    #     # print("A is", self.A)
+    #     print('A row sum is',np.sum(self.A, axis=1))
+    #     # print('B is', self.B)
+    #     print('B row sum is',np.sum(self.B, axis = 1))
+    #     print('pie is',self.pie)
+    #     print('initial log prob=',log_prob)
+    #     return log_prob
+
     def forward(self,obs):
         """
         :param obs: is a 1d array shape (T,), observations are in range(0,num_obs)
@@ -210,7 +323,65 @@ class hmm:
 
         return gen_sequence,gen_states
 
-    
+    # def train_on_one_example(self, obs, state=None):
+    #     """
+    #     :param state: 1 d array , shape = (T, )
+    #     :param obs: 1d array, shape = (T, )
+    #     :return:
+    #     """
+    #     self.forward(obs)
+    #     self.backward(obs)
+    #     zeta, gamma = [], []
+    #     for t in range(self.num_states-1):
+    #         ## calculate zeta_t
+    #         # zeta_table_for_t = np.zeros(self.A.shape[0], self.A.shape[0])
+    #         temp = self.beta[t + 1] * self.B[:, obs[t + 1]]
+    #         # temp = np.reshape(temp, newshape=(1, temp.shape[0]))
+    #         temp2 = self.alpha[t]
+    #         temp3 = np.outer(temp2, temp)
+    #         zeta_table_for_t = temp3 * self.A
+    #         zeta_table_for_t /= np.sum(zeta_table_for_t)
+    #         zeta.append(zeta_table_for_t)
+    #
+    #         ## calculate gamma
+    #         gamma_t = np.sum(zeta_table_for_t, axis=1)
+    #         gamma.append(gamma_t)
+    #
+    #     ###updates...
+    #     zeta = np.array(zeta)
+    #     gamma = np.array(gamma)
+    #     self.pie = gamma[0]
+    #     temp = np.sum(gamma, axis = 0).reshape(self.num_states,1)
+    #     self.A = np.sum(zeta, axis =0) / temp
+    #
+    #     print("A is", self.A)
+    #     # updating B
+    #     # modify gamma array, now calculate gamma_T
+    #     gamma_T = self.alpha[-1,:]/np.sum(self.alpha[-1,:]) # gamma of last time step
+    #     gamma = gamma.tolist()
+    #     gamma.append(gamma_T)
+    #     gamma = np.array(gamma)
+    #     # print('gamma is', gamma)
+    #
+    #     # indicator_3d = np.zeros((self.num_obs, gamma.shape[0], gamma.shape[1]))
+    #     # # assuming obs states are 0,1,2...., obs-1
+    #     # for i in range(self.num_obs):
+    #     #     for j in range(obs.shape[0]):
+    #     #         if obs[j] == i:
+    #     #             indicator_3d[i,j,state[j]] += 1
+    #     # print(indicator_3d)
+    #     # exit()
+    #     # temp = temp.reshape((temp.shape[0],))
+    #     deno_B = np.sum(gamma, axis = 0).reshape(-1,1) # required for broadcasting along column
+    #     B_ = np.zeros(self.B.shape)
+    #     for i in range(obs.shape[0]):
+    #         B_[:,obs[i]] += gamma[i]
+    #         # print('B_ is',B_)
+    #     B_/= deno_B
+    #     self.B = B_
+    #     # print("B is", self.B)
+    #     # print('sum of emission prob', np.sum(self.B, axis=1))
+
     def train_on_examples(self, observations, states=None, verbose = True):
         """
         :param states: list of 1d array each of shape = (T, )
@@ -233,8 +404,18 @@ class hmm:
             # gamma /= np.sum(self.alpha[-1]) # is not needed, since it is later divided by probability
 
             for t in range(obs.shape[0]-1):
+                ## calculate zeta_t
+                # zeta_table_for_t = np.zeros(self.A.shape[0], self.A.shape[0])
+                # temp = self.beta[t + 1] * self.B[:, obs[t + 1]]
+                # temp = np.reshape(temp, newshape=(1, temp.shape[0]))
+                # temp2 = self.alpha[t]
+                # temp3 = np.outer(self.alpha[t], self.beta[t + 1] * self.B[:, obs[t + 1]])
                 zeta_num[t] = np.outer(self.alpha[t], self.beta[t + 1] * self.B[:, obs[t + 1]]) * self.A
-               
+                # zeta[t] /= np.sum(zeta[t])# is not needed, since it is being divided by probability later
+                # zeta.append(zeta_table_for_t)
+                ## calculate gamma
+                # gamma_t = np.sum(zeta_table_for_t, axis=1)
+                # gamma.append(gamma_t)
 
             prob_of_obs = np.sum(self.alpha[-1])
             ###updates...
@@ -245,7 +426,12 @@ class hmm:
             A_num_temp += np.sum(zeta_num, axis =0)/(prob_of_obs )
             A_deno_temp += temp/(prob_of_obs ) # can add a small number 1e-6
 
-            
+            # updating B
+            # modify gamma array, now calculate gamma_T
+            # gamma_T = self.alpha[-1,:]/np.sum(self.alpha[-1,:]) # gamma of last time step, since beta is all 1s
+            # gamma = gamma.tolist()
+            # gamma.append(gamma_T)
+            # gamma = np.array(gamma)
             B_deno_temp += (np.sum(gamma_num, axis = 0).reshape(-1,1)/prob_of_obs) # required for broadcasting along column
             # B_ = np.zeros(self.B.shape)
             for i in range(obs.shape[0]):
@@ -339,21 +525,48 @@ class hmm_scale(hmm):
             # print('zeta num sum along 2nd axis',np.sum(zeta_num,axis=2))
             # prob_of_obs = np.sum(self.alpha_tilda[-1]) #modify this
             prob_of_obs = np.prod(self.scale_factor)
+            print('prob_of_obs is', prob_of_obs)
             prob_of_obs = 1
             ###updates...
-            pie_temp += (gamma_num[0]/prob_of_obs)
-            temp = np.sum(gamma_num[0:-1], axis = 0).reshape(self.num_states,1)
+            pie_temp += gamma_num[0]
+            temp = np.sum(gamma_num[0:-1], axis=0).reshape(self.num_states, 1)
             '''can we do this division on log scale..???
             '''
-            A_num_temp += np.sum(zeta_num, axis =0)/(prob_of_obs ) # can add 1 e-6 in denominator
-            A_deno_temp += temp/(prob_of_obs) # can add 1 e-6 in denominator
-
-            
-            B_deno_temp += (np.sum(gamma_num, axis = 0).reshape(-1,1)/(prob_of_obs)) # required for broadcasting along column
+            A_num_temp += np.sum(zeta_num, axis=0)
+            A_deno_temp += temp
+            # print('zeta num', zeta_num)
+            # updating B
+            # modify gamma array, now calculate gamma_T
+            # gamma_T = self.alpha_tilda[-1,:]/np.sum(self.alpha_tilda[-1,:]) # gamma of last time step
+            # gamma = gamma.tolist()
+            # gamma.append(gamma_T)
+            # gamma = np.array(gamma)
+            B_deno_temp += (np.sum(gamma_num, axis=0).reshape(-1, 1) )  # required for broadcasting along column
             # B_ = np.zeros(self.B.shape)
             for i in range(obs.shape[0]):
-                B_num_temp[:,obs[i]] += (gamma_num[i]/prob_of_obs)
-           
+                B_num_temp[:, obs[i]] += gamma_num[i]
+
+            # pie_temp += (gamma_num[0]/prob_of_obs)
+            # temp = np.sum(gamma_num[0:-1], axis = 0).reshape(self.num_states,1)
+            # '''can we do this division on log scale..???
+            # '''
+            # A_num_temp += np.sum(zeta_num, axis =0)/(prob_of_obs ) # can add 1 e-6 in denominator
+            # A_deno_temp += temp/(prob_of_obs) # can add 1 e-6 in denominator
+            # # print('zeta num', zeta_num)
+            # # updating B
+            # # modify gamma array, now calculate gamma_T
+            # # gamma_T = self.alpha_tilda[-1,:]/np.sum(self.alpha_tilda[-1,:]) # gamma of last time step
+            # # gamma = gamma.tolist()
+            # # gamma.append(gamma_T)
+            # # gamma = np.array(gamma)
+            # B_deno_temp += (np.sum(gamma_num, axis = 0).reshape(-1,1)/(prob_of_obs)) # required for broadcasting along column
+            # # B_ = np.zeros(self.B.shape)
+            # for i in range(obs.shape[0]):
+            #     B_num_temp[:,obs[i]] += (gamma_num[i]/prob_of_obs)
+                # print('B_ is',B_)
+            # B_num_temp /= (prob_of_obs ) # can add 1 e-6 in denominator
+            # B_deno_temp /= (prob_of_obs )# can add 1 e-6 in denominator
+            # print('prob of obs is', np.prod(self.scale_factor))
 
         # print('A denominator', A_deno_temp)
         # print('B denominator', B_deno_temp)
@@ -369,7 +582,7 @@ class hmm_scale(hmm):
             print('sum of pie',np.sum(self.pie))
             print('initial log prob=',log_prob)
 
-        return log_prob, sum_prob
+        return log_prob
 
 class hmm_scale_start_state(hmm_scale):
     '''
@@ -536,51 +749,3 @@ class hmm_scale_start_state(hmm_scale):
         # how to store all such options, try using dictionary
         np.random.seed(1)
         pass
-
-
-def test_one_example():
-    # example from https://www.cs.rochester.edu/u/james/CSC248/Lec11.pdf
-    A = np.array([[.6, .4],[.3, .7]])
-    B = np.array([[.3, .4, .3],[.4, .3, .3]])
-    pi = np.array([.8, .2])
-    obs = np.array([0,1,2,2])
-
-    h = hmm(2, 3, A = A,B= B,pie= pi)
-    h.forward(np.array([0,1,2,2]))
-    h.backward(np.array([0,1,2,2]))
-    seq_prob = []
-    for i in range(40):
-        # print('alpha is',h.alpha)
-        # print('beta is', h.beta)
-        seq_prob.append(np.log(np.sum(h.alpha[-1,:])))
-        h.train_on_one_example(state = np.array([0,1,1,1]), obs = obs)
-        h.viterbiAlgorithm_logscale(obs)
-
-    print(seq_prob)
-    plt.xlabel('iteration count of updates')
-    plt.ylabel('log likelihood of the sequence')
-    plt.plot(seq_prob)
-
-def test_multi_obs():
-    A = np.array([[.6, .4], [.3, .7]])
-    B = np.array([[.3, .4, .3], [.4, .3, .3]])
-    pi = np.array([.8, .2])
-    obs = np.array([0, 1, 2, 2])
-    obs2 = np.array([1,0,1,2])
-    obs3 = np.array([1,1,0,2])
-    observations = [obs, obs2, obs3]
-    h = hmm_scale(num_states= 2, num_obs=3, A =A, B = B,pie= pi)
-    seq_prob = []
-    for i in range(55):
-        seq_prob.append(h.train_on_examples(None,observations))
-    print(seq_prob)
-
-    plt.xlabel('iteration count of updates')
-    plt.ylabel('log likelihood of the sequence')
-    plt.plot(seq_prob)
-
-if '__name__' == '__main__':
-
-    # test_one_example()
-    pass
-    test_multi_obs()
